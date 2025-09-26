@@ -79,11 +79,15 @@ export const taskService = {
     return { data, error };
   },
 
-  // Complete a task
-  async completeTask(userId: string, taskId: string) {
-    const { data, error } = await supabase.rpc('complete_task', {
-      p_user_id: userId,
-      p_task_id: taskId
+  // Complete a task with YouTube verification
+  async completeTask(userId: string, taskId: string, taskType: 'watch' | 'like' | 'subscribe', videoId: string) {
+    const { data, error } = await supabase.functions.invoke('youtube-verification', {
+      body: {
+        userId,
+        taskId,
+        taskType,
+        videoId
+      }
     });
 
     return { data, error };
@@ -175,5 +179,44 @@ export const taskService = {
       .subscribe();
 
     return () => supabase.removeChannel(channel);
+  },
+
+  // Verify task and check for fraud
+  async verifyTaskCompletion(userId: string, taskId: string, taskType: 'watch' | 'like' | 'subscribe', videoId: string) {
+    // First check for fraud patterns
+    const { data: fraudCheck, error: fraudError } = await supabase.rpc('detect_fraud_patterns', {
+      p_user_id: userId
+    });
+
+    if (fraudError) {
+      return { data: null, error: fraudError };
+    }
+
+    if ((fraudCheck as any)?.suspicious_activity) {
+      return { 
+        data: null, 
+        error: { message: 'Suspicious activity detected. Please try again later.' }
+      };
+    }
+
+    // Proceed with task verification
+    return this.completeTask(userId, taskId, taskType, videoId);
+  },
+
+  // Get available tasks with fraud prevention
+  async getAvailableTasksSecure(userId: string, taskType?: 'watch' | 'like' | 'subscribe') {
+    // Check user's fraud status first
+    const { data: fraudCheck } = await supabase.rpc('detect_fraud_patterns', {
+      p_user_id: userId
+    });
+
+    if ((fraudCheck as any)?.risk_level === 'high') {
+      return { 
+        data: [], 
+        error: { message: 'Account temporarily restricted due to suspicious activity' }
+      };
+    }
+
+    return this.getAvailableTasks(userId, taskType);
   }
 };

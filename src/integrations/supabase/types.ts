@@ -174,6 +174,33 @@ export type Database = {
           },
         ]
       }
+      referral_events: {
+        Row: {
+          bonus_awarded: number
+          created_at: string
+          id: string
+          referee_id: string
+          referral_code: string
+          referrer_id: string
+        }
+        Insert: {
+          bonus_awarded?: number
+          created_at?: string
+          id?: string
+          referee_id: string
+          referral_code: string
+          referrer_id: string
+        }
+        Update: {
+          bonus_awarded?: number
+          created_at?: string
+          id?: string
+          referee_id?: string
+          referral_code?: string
+          referrer_id?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           created_at: string | null
@@ -221,6 +248,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
@@ -364,6 +412,10 @@ export type Database = {
         }
         Returns: string
       }
+      detect_fraud_patterns: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       get_user_role: {
         Args: { user_uuid: string }
         Returns: string
@@ -375,6 +427,15 @@ export type Database = {
       update_user_level: {
         Args: { p_user_id: string }
         Returns: undefined
+      }
+      verify_task_completion: {
+        Args: {
+          p_task_id: string
+          p_task_type: string
+          p_user_id: string
+          p_video_id: string
+        }
+        Returns: boolean
       }
     }
     Enums: {

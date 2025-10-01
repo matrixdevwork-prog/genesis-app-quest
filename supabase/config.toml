@@ -64,6 +64,15 @@ verify_jwt = true
 [functions.referral-system]
 verify_jwt = true
 
+[functions.moderation]
+verify_jwt = true
+
+[functions.push-notifications]
+verify_jwt = true
+
+[functions.fraud-detection]
+verify_jwt = true
+
 [edge_runtime]
 policy = "per_worker"
 inspector_port = 8083

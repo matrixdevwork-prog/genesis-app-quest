@@ -71,6 +71,51 @@ export type Database = {
           },
         ]
       }
+      content_reports: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string | null
+          description: string | null
+          id: string
+          reason: string
+          reported_by: string | null
+          resolution_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reason: string
+          reported_by?: string | null
+          resolution_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reason?: string
+          reported_by?: string | null
+          resolution_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       credit_transactions: {
         Row: {
           amount: number
@@ -108,6 +153,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fraud_logs: {
+        Row: {
+          created_at: string | null
+          details: Json | null
+          device_fingerprint: string | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          risk_score: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          details?: Json | null
+          device_fingerprint?: string | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          risk_score?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          details?: Json | null
+          device_fingerprint?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          risk_score?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      moderation_queue: {
+        Row: {
+          assigned_to: string | null
+          auto_flagged: boolean | null
+          content_id: string
+          content_type: string
+          created_at: string | null
+          flag_reasons: Json | null
+          id: string
+          notes: string | null
+          priority: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          auto_flagged?: boolean | null
+          content_id: string
+          content_type: string
+          created_at?: string | null
+          flag_reasons?: Json | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          auto_flagged?: boolean | null
+          content_id?: string
+          content_type?: string
+          created_at?: string | null
+          flag_reasons?: Json | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -173,6 +299,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string | null
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       referral_events: {
         Row: {
@@ -266,6 +419,51 @@ export type Database = {
           achievement_id?: string
           earned_at?: string
           id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_bans: {
+        Row: {
+          appeal_reviewed_at: string | null
+          appeal_reviewed_by: string | null
+          appeal_status: string | null
+          appeal_text: string | null
+          ban_type: string
+          banned_by: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          reason: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          appeal_reviewed_at?: string | null
+          appeal_reviewed_by?: string | null
+          appeal_status?: string | null
+          appeal_text?: string | null
+          ban_type?: string
+          banned_by?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          reason: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          appeal_reviewed_at?: string | null
+          appeal_reviewed_by?: string | null
+          appeal_status?: string | null
+          appeal_text?: string | null
+          ban_type?: string
+          banned_by?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          reason?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -398,6 +596,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      auto_flag_content: {
+        Args: { p_content_id: string; p_content_type: string; p_reasons: Json }
+        Returns: string
+      }
+      check_user_banned: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       complete_task: {
         Args: { p_task_id: string; p_user_id: string }
         Returns: boolean
@@ -423,6 +629,16 @@ export type Database = {
       is_admin: {
         Args: { user_uuid: string }
         Returns: boolean
+      }
+      log_fraud_event: {
+        Args: {
+          p_details: Json
+          p_device_fingerprint: string
+          p_event_type: string
+          p_ip_address: unknown
+          p_user_id: string
+        }
+        Returns: undefined
       }
       update_user_level: {
         Args: { p_user_id: string }

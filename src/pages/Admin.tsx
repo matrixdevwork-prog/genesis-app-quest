@@ -1,13 +1,22 @@
 import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Sidebar from '@/components/layout/Sidebar';
+import AdminDashboard from './admin/AdminDashboard';
+import AdminUsers from './admin/AdminUsers';
+import AdminModeration from './admin/AdminModeration';
 
 const Admin: React.FC = () => {
   return (
-    <div className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-foreground mb-6">Admin Dashboard</h1>
-      {/* Admin content will be implemented in Phase 7 */}
-      <div className="text-center text-muted-foreground">
-        Admin panel coming in Phase 7
-      </div>
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 p-8 bg-background">
+        <Routes>
+          <Route index element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="moderation" element={<AdminModeration />} />
+          <Route path="*" element={<Navigate to="/admin" replace />} />
+        </Routes>
+      </main>
     </div>
   );
 };

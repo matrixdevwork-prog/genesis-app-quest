@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   User, 
   Camera, 
   Settings, 
-  Shield, 
   Bell, 
   Share2, 
   Copy, 
@@ -30,76 +31,115 @@ import {
   ModalTrigger,
   ModalFooter 
 } from '@/components/ui/modal';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 const Profile: React.FC = () => {
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { user, profile, signOut, updateProfile, uploadAvatar } = useAuth();
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Mock user data
-  const user = {
-    id: '1',
-    name: 'John Doe',
-    username: 'johndoe',
-    email: 'john@example.com',
-    avatar: '',
-    joinedDate: '2024-01-15',
-    referralCode: 'JOHN2024',
-    stats: {
-      totalEarned: 1250,
-      currentLevel: 5,
-      subscribersGained: 145,
-      totalTasks: 89,
-    },
-    settings: {
-      emailNotifications: true,
-      pushNotifications: false,
-      marketingEmails: false,
-    }
-  };
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [editedUsername, setEditedUsername] = useState(profile?.username || '');
+  const [editedFullName, setEditedFullName] = useState(profile?.full_name || '');
+  const [editedYoutubeChannel, setEditedYoutubeChannel] = useState(profile?.youtube_channel || '');
+  
+  const [settings, setSettings] = useState({
+    emailNotifications: profile?.preferences?.notifications ?? true,
+    pushNotifications: false,
+    marketingEmails: false,
+  });
 
-  const [settings, setSettings] = useState(user.settings);
-
-  const handleSettingChange = (setting: string, value: boolean) => {
+  const handleSettingChange = async (setting: string, value: boolean) => {
     setSettings(prev => ({
       ...prev,
       [setting]: value
     }));
-    toast({
-      title: "Settings updated",
-      description: "Your preferences have been saved.",
-    });
+    
+    const newPreferences = {
+      ...profile?.preferences,
+      notifications: setting === 'emailNotifications' ? value : settings.emailNotifications
+    };
+    
+    await updateProfile({ preferences: newPreferences });
   };
 
-  const handleCopyReferralCode = () => {
-    navigator.clipboard.writeText(user.referralCode);
-    toast({
-      title: "Referral code copied!",
-      description: "Share it with friends to earn bonus credits.",
-    });
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
   };
 
-  const handleShareReferral = () => {
-    const shareText = `Join Sub4Sub with my referral code ${user.referralCode} and we both get bonus credits!`;
-    if (navigator.share) {
-      navigator.share({
-        title: 'Sub4Sub Referral',
-        text: shareText,
-        url: `${window.location.origin}?ref=${user.referralCode}`
-      });
-    } else {
-      navigator.clipboard.writeText(`${shareText} ${window.location.origin}?ref=${user.referralCode}`);
-      toast({
-        title: "Referral link copied!",
-        description: "Share it with friends to earn bonus credits.",
-      });
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    const { error } = await uploadAvatar(file);
+    setIsUploadingAvatar(false);
+
+    if (!error) {
+      toast.success('Avatar updated successfully');
     }
   };
 
-  const handleLogout = () => {
-    // TODO: Implement actual logout logic in Phase 4
-    console.log('Logging out...');
-    setShowLogoutModal(false);
+  const handleUpdateProfile = async () => {
+    setIsUpdating(true);
+    await updateProfile({
+      username: editedUsername || null,
+      full_name: editedFullName || null,
+      youtube_channel: editedYoutubeChannel || null,
+    });
+    setIsUpdating(false);
   };
+
+  const handleCopyReferralCode = () => {
+    if (!profile?.referral_code) return;
+    navigator.clipboard.writeText(profile.referral_code);
+    toast.success('Referral code copied to clipboard');
+  };
+
+  const handleShareReferral = () => {
+    if (!profile?.referral_code) return;
+    const shareText = `Join Sub For Sub with my referral code ${profile.referral_code} and we both get bonus credits!`;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Sub For Sub Referral',
+        text: shareText,
+        url: `${window.location.origin}?ref=${profile.referral_code}`
+      });
+    } else {
+      navigator.clipboard.writeText(`${shareText} ${window.location.origin}?ref=${profile.referral_code}`);
+      toast.success('Referral link copied to clipboard');
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    setShowLogoutModal(false);
+    navigate('/login');
+  };
+
+  if (!profile) {
+    return (
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
@@ -110,34 +150,45 @@ const Profile: React.FC = () => {
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
               <div className="relative">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarImage src={profile.avatar_url || ''} alt={profile.full_name || 'User'} />
                   <AvatarFallback className="text-2xl">
                     <User className="h-12 w-12" />
                   </AvatarFallback>
                 </Avatar>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
                 <Button 
                   size="sm" 
                   className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
+                  onClick={handleAvatarClick}
+                  disabled={isUploadingAvatar}
                 >
                   <Camera className="h-4 w-4" />
                 </Button>
               </div>
               
               <div className="flex-1 text-center md:text-left">
-                <h1 className="text-2xl font-bold text-foreground">{user.name}</h1>
-                <p className="text-muted-foreground">@{user.username}</p>
+                <h1 className="text-2xl font-bold text-foreground">
+                  {profile.full_name || user?.email || 'Anonymous User'}
+                </h1>
+                {profile.username && <p className="text-muted-foreground">@{profile.username}</p>}
                 <p className="text-sm text-muted-foreground mt-1">
-                  Member since {new Date(user.joinedDate).toLocaleDateString('en-US', { 
+                  Member since {new Date(profile.created_at).toLocaleDateString('en-US', { 
                     year: 'numeric', 
                     month: 'long' 
                   })}
                 </p>
                 <div className="flex items-center justify-center md:justify-start gap-2 mt-3">
                   <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                    Level {user.stats.currentLevel}
+                    Level {profile.level}
                   </Badge>
                   <Badge variant="outline">
-                    {user.stats.totalEarned} Credits Earned
+                    {profile.credits} Credits
                   </Badge>
                 </div>
               </div>
@@ -150,32 +201,32 @@ const Profile: React.FC = () => {
           <Card>
             <CardContent className="p-4 text-center">
               <Coins className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold text-foreground">{user.stats.totalEarned}</div>
-              <div className="text-sm text-muted-foreground">Total Credits</div>
+              <div className="text-2xl font-bold text-foreground">{profile.credits}</div>
+              <div className="text-sm text-muted-foreground">Current Credits</div>
             </CardContent>
           </Card>
           
           <Card>
             <CardContent className="p-4 text-center">
               <Trophy className="h-8 w-8 mx-auto mb-2 text-warning" />
-              <div className="text-2xl font-bold text-foreground">{user.stats.currentLevel}</div>
+              <div className="text-2xl font-bold text-foreground">{profile.level}</div>
               <div className="text-sm text-muted-foreground">Current Level</div>
             </CardContent>
           </Card>
           
           <Card>
             <CardContent className="p-4 text-center">
-              <Users className="h-8 w-8 mx-auto mb-2 text-success" />
-              <div className="text-2xl font-bold text-foreground">{user.stats.subscribersGained}</div>
-              <div className="text-sm text-muted-foreground">Subscribers</div>
+              <BarChart3 className="h-8 w-8 mx-auto mb-2 text-success" />
+              <div className="text-2xl font-bold text-foreground">{profile.xp}</div>
+              <div className="text-sm text-muted-foreground">Experience Points</div>
             </CardContent>
           </Card>
           
           <Card>
             <CardContent className="p-4 text-center">
-              <BarChart3 className="h-8 w-8 mx-auto mb-2 text-secondary" />
-              <div className="text-2xl font-bold text-foreground">{user.stats.totalTasks}</div>
-              <div className="text-sm text-muted-foreground">Tasks Done</div>
+              <Users className="h-8 w-8 mx-auto mb-2 text-secondary" />
+              <div className="text-2xl font-bold text-foreground">{profile.streak_count}</div>
+              <div className="text-sm text-muted-foreground">Day Streak</div>
             </CardContent>
           </Card>
         </div>
@@ -194,7 +245,7 @@ const Profile: React.FC = () => {
           <CardContent className="space-y-4">
             <div className="flex gap-2">
               <Input 
-                value={user.referralCode} 
+                value={profile.referral_code} 
                 readOnly 
                 className="font-mono"
               />
@@ -226,13 +277,42 @@ const Profile: React.FC = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" value={user.email} readOnly />
+                <Input id="email" value={user?.email || ''} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input 
+                  id="fullName" 
+                  value={editedFullName} 
+                  onChange={(e) => setEditedFullName(e.target.value)}
+                  placeholder="Enter your full name"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
-                <Input id="username" value={user.username} />
+                <Input 
+                  id="username" 
+                  value={editedUsername} 
+                  onChange={(e) => setEditedUsername(e.target.value)}
+                  placeholder="Choose a username"
+                />
               </div>
-              <Button className="w-full">Update Profile</Button>
+              <div className="space-y-2">
+                <Label htmlFor="youtube">YouTube Channel URL</Label>
+                <Input 
+                  id="youtube" 
+                  value={editedYoutubeChannel} 
+                  onChange={(e) => setEditedYoutubeChannel(e.target.value)}
+                  placeholder="https://youtube.com/@yourchannel"
+                />
+              </div>
+              <Button 
+                className="w-full" 
+                onClick={handleUpdateProfile}
+                disabled={isUpdating}
+              >
+                {isUpdating ? 'Updating...' : 'Update Profile'}
+              </Button>
             </CardContent>
           </Card>
 

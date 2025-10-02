@@ -4,6 +4,7 @@ import { Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
 import Promote from "./pages/Promote";
@@ -21,9 +22,10 @@ import ProtectedRoute from "./components/layout/ProtectedRoute";
 const App = () => (
   <Routes>
     {/* Public routes */}
-    <Route path="/" element={<Index />} />
-    <Route path="/login" element={<Login />} />
-    <Route path="/signup" element={<Signup />} />
+      <Route path="/" element={<Index />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
     
     {/* Protected routes with main layout */}
     <Route element={<MainLayout />}>

@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Plus, Play, Pause, BarChart3, Eye, Heart, UserPlus, Coins, Settings } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,41 +22,11 @@ import {
 } from '@/components/ui/modal';
 
 const Promote: React.FC = () => {
+  const { user, profile } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [campaigns, setCampaigns] = useState([
-    {
-      id: 1,
-      title: 'My Guitar Tutorial',
-      videoUrl: 'https://youtube.com/watch?v=example1',
-      thumbnail: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&h=200&fit=crop',
-      status: 'active',
-      creditsAllocated: 100,
-      creditsUsed: 65,
-      targetActions: ['watch', 'like'],
-      stats: {
-        views: 234,
-        likes: 45,
-        subscribers: 12,
-      },
-      createdAt: '2024-01-15',
-    },
-    {
-      id: 2,
-      title: 'Cooking Masterclass',
-      videoUrl: 'https://youtube.com/watch?v=example2',
-      thumbnail: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=200&fit=crop',
-      status: 'paused',
-      creditsAllocated: 50,
-      creditsUsed: 20,
-      targetActions: ['watch', 'subscribe'],
-      stats: {
-        views: 89,
-        likes: 15,
-        subscribers: 8,
-      },
-      createdAt: '2024-01-10',
-    },
-  ]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
 
   const [newCampaign, setNewCampaign] = useState({
     title: '',
@@ -63,26 +36,162 @@ const Promote: React.FC = () => {
     description: '',
   });
 
-  const handleCreateCampaign = () => {
-    // TODO: Implement actual campaign creation in Phase 6
-    console.log('Creating campaign:', newCampaign);
-    setShowCreateModal(false);
-    // Reset form
-    setNewCampaign({
-      title: '',
-      videoUrl: '',
-      creditsToAllocate: [50],
-      targetActions: [],
-      description: '',
-    });
+  useEffect(() => {
+    if (user) {
+      fetchCampaigns();
+    }
+  }, [user]);
+
+  const fetchCampaigns = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select(`
+          *,
+          videos (
+            id,
+            youtube_id,
+            title,
+            description,
+            thumbnail_url,
+            channel_name
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCampaigns(data || []);
+    } catch (error: any) {
+      console.error('Error fetching campaigns:', error);
+      toast.error('Failed to load campaigns');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleCampaignAction = (campaignId: number, action: string) => {
-    setCampaigns(campaigns.map(campaign => 
-      campaign.id === campaignId 
-        ? { ...campaign, status: action === 'pause' ? 'paused' : 'active' }
-        : campaign
-    ));
+  const handleCreateCampaign = async () => {
+    if (!user || !profile) {
+      toast.error('Please log in to create campaigns');
+      return;
+    }
+
+    if (!newCampaign.videoUrl || !newCampaign.title) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (newCampaign.targetActions.length === 0) {
+      toast.error('Please select at least one target action');
+      return;
+    }
+
+    if (profile.credits < newCampaign.creditsToAllocate[0]) {
+      toast.error('Insufficient credits');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      // Extract video ID from URL
+      const videoId = newCampaign.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)?.[1];
+      if (!videoId) {
+        toast.error('Invalid YouTube URL');
+        return;
+      }
+
+      // Create or get video record
+      const { data: existingVideo } = await supabase
+        .from('videos')
+        .select('id')
+        .eq('youtube_id', videoId)
+        .single();
+
+      let videoDbId = existingVideo?.id;
+
+      if (!videoDbId) {
+        // Create new video record
+        const { data: newVideo, error: videoError } = await supabase
+          .from('videos')
+          .insert({
+            youtube_id: videoId,
+            title: newCampaign.title,
+            description: newCampaign.description || null,
+            channel_name: 'Your Channel', // This should come from YouTube API
+          })
+          .select()
+          .single();
+
+        if (videoError) throw videoError;
+        videoDbId = newVideo.id;
+      }
+
+      // Create campaign
+      const { data: campaign, error: campaignError } = await supabase
+        .from('campaigns')
+        .insert({
+          user_id: user.id,
+          video_id: videoDbId,
+          title: newCampaign.title,
+          credits_allocated: newCampaign.creditsToAllocate[0],
+          target_actions: newCampaign.targetActions.length * 100, // Placeholder for now
+          status: 'active',
+        })
+        .select()
+        .single();
+
+      if (campaignError) throw campaignError;
+
+      // Deduct credits
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ credits: profile.credits - newCampaign.creditsToAllocate[0] })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      toast.success('Campaign created successfully!');
+      setShowCreateModal(false);
+      setNewCampaign({
+        title: '',
+        videoUrl: '',
+        creditsToAllocate: [50],
+        targetActions: [],
+        description: '',
+      });
+      fetchCampaigns();
+    } catch (error: any) {
+      console.error('Error creating campaign:', error);
+      toast.error('Failed to create campaign');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleCampaignAction = async (campaignId: string, action: string) => {
+    try {
+      const newStatus = action === 'pause' ? 'paused' : 'active';
+      const { error } = await supabase
+        .from('campaigns')
+        .update({ status: newStatus })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      setCampaigns(campaigns.map(campaign => 
+        campaign.id === campaignId 
+          ? { ...campaign, status: newStatus }
+          : campaign
+      ));
+      
+      toast.success(`Campaign ${newStatus === 'paused' ? 'paused' : 'resumed'}`);
+    } catch (error: any) {
+      console.error('Error updating campaign:', error);
+      toast.error('Failed to update campaign');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -214,15 +323,21 @@ const Promote: React.FC = () => {
               <Button variant="outline" onClick={() => setShowCreateModal(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateCampaign}>
-                Create Campaign
+              <Button onClick={handleCreateCampaign} disabled={isCreating}>
+                {isCreating ? 'Creating...' : 'Create Campaign'}
               </Button>
             </ModalFooter>
           </ModalContent>
         </Modal>
       </div>
 
-      {campaigns.length === 0 ? (
+      {isLoading ? (
+        <Card className="text-center py-12">
+          <CardContent>
+            <p className="text-muted-foreground">Loading campaigns...</p>
+          </CardContent>
+        </Card>
+      ) : campaigns.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
             <div className="flex flex-col items-center space-y-4">
@@ -249,12 +364,18 @@ const Promote: React.FC = () => {
               <CardContent className="p-0">
                 <div className="flex">
                   {/* Thumbnail */}
-                  <div className="w-48 h-32 flex-shrink-0">
-                    <img 
-                      src={campaign.thumbnail} 
-                      alt={campaign.title}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="w-48 h-32 flex-shrink-0 bg-muted">
+                    {campaign.videos?.thumbnail_url ? (
+                      <img 
+                        src={campaign.videos.thumbnail_url} 
+                        alt={campaign.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BarChart3 className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Campaign Info */}
@@ -265,23 +386,12 @@ const Promote: React.FC = () => {
                           {campaign.title}
                         </h3>
                         <p className="text-sm text-muted-foreground mb-2">
-                          Created {campaign.createdAt}
+                          Created {new Date(campaign.created_at).toLocaleDateString()}
                         </p>
                         <div className="flex items-center gap-2">
                           <Badge className={getStatusColor(campaign.status)}>
                             {campaign.status}
                           </Badge>
-                          <div className="flex gap-1">
-                            {campaign.targetActions.map((action) => {
-                              const ActionIcon = getActionIcon(action);
-                              return (
-                                <div key={action} className="flex items-center text-xs text-muted-foreground">
-                                  <ActionIcon className="h-3 w-3 mr-1" />
-                                  {action}
-                                </div>
-                              );
-                            })}
-                          </div>
                         </div>
                       </div>
 
@@ -303,38 +413,28 @@ const Promote: React.FC = () => {
                             </>
                           )}
                         </Button>
-                        <Button variant="outline" size="sm">
-                          <Settings className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                       <div className="text-center">
-                        <div className="text-xl font-bold text-foreground">{campaign.stats.views}</div>
+                        <div className="text-xl font-bold text-foreground">{campaign.completed_actions}</div>
+                        <div className="text-xs text-muted-foreground flex items-center justify-center">
+                          <BarChart3 className="h-3 w-3 mr-1" />
+                          Completed
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-foreground">{campaign.target_actions}</div>
                         <div className="text-xs text-muted-foreground flex items-center justify-center">
                           <Eye className="h-3 w-3 mr-1" />
-                          Views
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xl font-bold text-foreground">{campaign.stats.likes}</div>
-                        <div className="text-xs text-muted-foreground flex items-center justify-center">
-                          <Heart className="h-3 w-3 mr-1" />
-                          Likes
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xl font-bold text-foreground">{campaign.stats.subscribers}</div>
-                        <div className="text-xs text-muted-foreground flex items-center justify-center">
-                          <UserPlus className="h-3 w-3 mr-1" />
-                          Subscribers
+                          Target
                         </div>
                       </div>
                       <div className="text-center">
                         <div className="text-xl font-bold text-foreground">
-                          {campaign.creditsAllocated - campaign.creditsUsed}
+                          {campaign.credits_allocated - campaign.credits_spent}
                         </div>
                         <div className="text-xs text-muted-foreground flex items-center justify-center">
                           <Coins className="h-3 w-3 mr-1" />
@@ -348,14 +448,14 @@ const Promote: React.FC = () => {
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Credits Used</span>
                         <span className="text-foreground">
-                          {campaign.creditsUsed} / {campaign.creditsAllocated}
+                          {campaign.credits_spent} / {campaign.credits_allocated}
                         </span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2">
                         <div 
                           className="bg-primary h-2 rounded-full transition-all" 
                           style={{ 
-                            width: `${Math.min(100, (campaign.creditsUsed / campaign.creditsAllocated) * 100)}%` 
+                            width: `${Math.min(100, (campaign.credits_spent / campaign.credits_allocated) * 100)}%` 
                           }}
                         />
                       </div>

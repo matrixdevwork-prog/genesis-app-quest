@@ -22,17 +22,17 @@ const Index: React.FC = () => {
               Connect with fellow creators, earn credits by supporting others, 
               and promote your own content to reach new audiences.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               {user ? (
-                <Button asChild size="lg" className="text-lg px-8">
+                <Button asChild size="lg" className="text-lg px-8 shadow-lg hover:shadow-xl transition-shadow">
                   <Link to="/dashboard">Go to Dashboard</Link>
                 </Button>
               ) : (
                 <>
-                  <Button asChild size="lg" className="text-lg px-8">
+                  <Button asChild size="lg" className="text-lg px-8 shadow-lg hover:shadow-xl transition-shadow">
                     <Link to="/signup">Get Started Free</Link>
                   </Button>
-                  <Button asChild variant="outline" size="lg" className="text-lg px-8">
+                  <Button asChild variant="outline" size="lg" className="text-lg px-8 shadow-lg hover:shadow-xl transition-shadow">
                     <Link to="/login">Sign In</Link>
                   </Button>
                 </>
@@ -145,7 +145,7 @@ const Index: React.FC = () => {
               Join Sub For Sub today and start connecting with fellow creators who want to grow together.
             </p>
             {!user && (
-              <Button asChild size="lg" className="text-lg px-8">
+              <Button asChild size="lg" className="text-lg px-8 shadow-lg hover:shadow-xl transition-shadow">
                 <Link to="/signup">Start Growing Today</Link>
               </Button>
             )}

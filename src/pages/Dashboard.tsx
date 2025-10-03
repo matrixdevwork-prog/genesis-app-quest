@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Play, TrendingUp, Users, Eye, Heart, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Spinner } from '@/components/ui/spinner';
 
 // Dashboard Components
 import StatsCard from '@/components/dashboard/StatsCard';
@@ -23,202 +26,86 @@ import EngagementChart from '@/components/charts/EngagementChart';
 import ActivityChart from '@/components/charts/ActivityChart';
 
 const Dashboard: React.FC = () => {
-  // Mock user data
-  const user = {
-    name: 'John',
-    credits: 1250,
-    level: 5,
-    currentXP: 750,
-    nextLevelXP: 1000,
-    totalXP: 4750,
-    streak: 7,
-    longestStreak: 12,
-    lastLogin: new Date(Date.now() - 12 * 60 * 60 * 1000), // 12 hours ago
+  const { user, profile } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (profile) {
+      loadDashboardData();
+    }
+  }, [profile]);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load recent transactions
+      const { data: transactionsData } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile?.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (transactionsData) {
+        setTransactions(transactionsData.map(t => ({
+          id: t.id,
+          type: t.amount > 0 ? 'earned' : 'spent',
+          amount: Math.abs(t.amount),
+          description: t.description || t.transaction_type,
+          timestamp: new Date(t.created_at)
+        })));
+
+        // Create activity feed from transactions
+        setActivities(transactionsData.slice(0, 5).map(t => ({
+          id: t.id,
+          type: t.amount > 0 ? 'credits_earned' : 'campaign_created',
+          description: t.description || t.transaction_type,
+          timestamp: new Date(t.created_at),
+          amount: t.amount > 0 ? t.amount : undefined
+        })));
+      }
+
+      // Load achievements
+      const { data: achievementsData } = await supabase
+        .from('user_achievements')
+        .select('*')
+        .eq('user_id', profile?.id);
+
+      if (achievementsData) {
+        setAchievements(achievementsData.map(a => ({
+          id: a.id,
+          title: a.achievement_id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          description: 'Achievement earned',
+          icon: 'trophy',
+          rarity: 'common',
+          earned: true,
+          earnedAt: new Date(a.earned_at)
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Mock statistics data
-  const stats = [
-    {
-      title: 'Total Subscribers',
-      value: '2,345',
-      description: '+12% from last month',
-      icon: Users,
-      trend: { value: 12, isPositive: true }
-    },
-    {
-      title: 'Video Views',
-      value: '48.2K',
-      description: '+8% from last month',
-      icon: Eye,
-      trend: { value: 8, isPositive: true }
-    },
-    {
-      title: 'Total Likes',
-      value: '3,892',
-      description: '+15% from last month',
-      icon: Heart,
-      trend: { value: 15, isPositive: true }
-    },
-    {
-      title: 'Watch Time',
-      value: '127h',
-      description: '+5% from last month',
-      icon: Clock,
-      trend: { value: 5, isPositive: true }
-    }
-  ];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
-  // Mock activity data
-  const activities = [
-    {
-      id: '1',
-      type: 'task_completed' as const,
-      description: 'Completed "Watch Guitar Tutorial" task',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      amount: 5
-    },
-    {
-      id: '2',
-      type: 'level_up' as const,
-      description: 'Reached Level 5!',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    },
-    {
-      id: '3',
-      type: 'credits_earned' as const,
-      description: 'Daily reward claimed',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      amount: 50
-    },
-    {
-      id: '4',
-      type: 'campaign_created' as const,
-      description: 'Created new promotion campaign',
-      timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000),
-    }
-  ];
-
-  // Mock transaction data
-  const transactions = [
-    {
-      id: '1',
-      type: 'earned' as const,
-      amount: 5,
-      description: 'Task completion',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000)
-    },
-    {
-      id: '2',
-      type: 'earned' as const,
-      amount: 50,
-      description: 'Daily reward',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000)
-    },
-    {
-      id: '3',
-      type: 'spent' as const,
-      amount: 100,
-      description: 'Campaign promotion',
-      timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000)
-    }
-  ];
-
-  // Mock achievements data
-  const achievements = [
-    {
-      id: '1',
-      title: 'First Steps',
-      description: 'Complete your first task',
-      icon: 'trophy' as const,
-      rarity: 'common' as const,
-      earned: true,
-      earnedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    },
-    {
-      id: '2',
-      title: 'Rising Star',
-      description: 'Reach Level 5',
-      icon: 'star' as const,
-      rarity: 'rare' as const,
-      earned: true,
-      earnedAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
-    },
-    {
-      id: '3',
-      title: 'Dedication',
-      description: 'Login for 7 consecutive days',
-      icon: 'medal' as const,
-      rarity: 'epic' as const,
-      earned: false,
-      progress: { current: 7, target: 7 }
-    },
-    {
-      id: '4',
-      title: 'Master Promoter',
-      description: 'Create 10 successful campaigns',
-      icon: 'crown' as const,
-      rarity: 'legendary' as const,
-      earned: false,
-      progress: { current: 3, target: 10 }
-    }
-  ];
-
-  // Mock milestones data
-  const milestones = [
-    {
-      id: '1',
-      title: 'Level Up Champion',
-      description: 'Reached Level 5',
-      type: 'level' as const,
-      icon: 'trophy' as const,
-      reward: {
-        type: 'credits' as const,
-        amount: 100,
-        description: '100 bonus credits'
-      },
-      achieved: true,
-      achievedAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
-    },
-    {
-      id: '2',
-      title: 'Task Master',
-      description: 'Complete 50 tasks',
-      type: 'tasks' as const,
-      icon: 'star' as const,
-      reward: {
-        type: 'multiplier' as const,
-        description: '2x credit multiplier for 1 day'
-      },
-      achieved: false
-    }
-  ];
-
-  // Mock chart data
-  const earningsData = [
-    { date: '2024-01-15', credits: 45, tasks: 3 },
-    { date: '2024-01-16', credits: 62, tasks: 4 },
-    { date: '2024-01-17', credits: 38, tasks: 2 },
-    { date: '2024-01-18', credits: 71, tasks: 5 },
-    { date: '2024-01-19', credits: 55, tasks: 3 },
-    { date: '2024-01-20', credits: 89, tasks: 6 },
-    { date: '2024-01-21', credits: 67, tasks: 4 }
-  ];
-
-  const engagementData = [
-    { campaign: 'Guitar Tutorial', views: 234, likes: 45, subscribers: 12 },
-    { campaign: 'Cooking Show', views: 189, likes: 32, subscribers: 8 },
-    { campaign: 'Tech Review', views: 156, likes: 28, subscribers: 6 }
-  ];
-
-  const activityData = [
-    { date: '2024-01-15', completed: 3, started: 4 },
-    { date: '2024-01-16', completed: 4, started: 5 },
-    { date: '2024-01-17', completed: 2, started: 3 },
-    { date: '2024-01-18', completed: 5, started: 6 },
-    { date: '2024-01-19', completed: 3, started: 4 },
-    { date: '2024-01-20', completed: 6, started: 7 },
-    { date: '2024-01-21', completed: 4, started: 5 }
-  ];
+  const userName = profile?.full_name?.split(' ')[0] || profile?.username || 'there';
+  const currentLevel = profile?.level || 1;
+  const currentXP = profile?.xp || 0;
+  const nextLevelXP = currentLevel * 1000;
+  const totalXP = profile?.xp || 0;
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl animate-fade-in">
@@ -227,7 +114,7 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">
-              Welcome back, {user.name}! 👋
+              Welcome back, {userName}! 👋
             </h1>
             <p className="text-muted-foreground mt-1">
               Here's what's happening with your channel today
@@ -250,26 +137,17 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Key Metrics Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <div key={stat.title} style={{ animationDelay: `${index * 100}ms` }}>
-              <StatsCard {...stat} />
-            </div>
-          ))}
-        </div>
-
         {/* Credit Balance & Level Progress */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <CreditBalance 
-            balance={user.credits} 
+            balance={profile?.credits || 0} 
             transactions={transactions}
           />
           <LevelProgress
-            currentLevel={user.level}
-            currentXP={user.currentXP}
-            nextLevelXP={user.nextLevelXP}
-            totalXP={user.totalXP}
+            currentLevel={currentLevel}
+            currentXP={currentXP}
+            nextLevelXP={nextLevelXP}
+            totalXP={totalXP}
           />
         </div>
 
@@ -281,58 +159,23 @@ const Dashboard: React.FC = () => {
             bonusMultiplier={1}
           />
           <StreakCounter
-            currentStreak={user.streak}
-            longestStreak={user.longestStreak}
-            lastLoginDate={user.lastLogin}
+            currentStreak={profile?.streak_count || 0}
+            longestStreak={profile?.streak_count || 0}
+            lastLoginDate={profile?.last_login_date ? new Date(profile.last_login_date) : new Date()}
           />
-          <div className="md:col-span-2 lg:col-span-1">
-            <ActivityFeed activities={activities} />
+          {activities.length > 0 && (
+            <div className="md:col-span-2 lg:col-span-1">
+              <ActivityFeed activities={activities} />
+            </div>
+          )}
+        </div>
+
+        {/* Achievements */}
+        {achievements.length > 0 && (
+          <div className="grid grid-cols-1">
+            <AchievementBadges achievements={achievements} />
           </div>
-        </div>
-
-        {/* Progress Tracking */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Weekly Goals</CardTitle>
-            <CardDescription>Track your progress towards weekly targets</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <ProgressBar
-              label="Tasks Completed"
-              current={28}
-              max={50}
-              color="primary"
-            />
-            <ProgressBar
-              label="Credits Earned"
-              current={420}
-              max={1000}
-              color="warning"
-            />
-            <ProgressBar
-              label="Campaigns Created"
-              current={3}
-              max={5}
-              color="secondary"
-            />
-          </CardContent>
-        </Card>
-
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <EarningsChart data={earningsData} timeRange="7d" />
-          <ActivityChart data={activityData} timeRange="7d" />
-        </div>
-
-        <div className="grid grid-cols-1">
-          <EngagementChart data={engagementData} />
-        </div>
-
-        {/* Achievements & Milestones */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AchievementBadges achievements={achievements} />
-          <MilestoneCard milestones={milestones} />
-        </div>
+        )}
 
         {/* Quick Actions */}
         <Card>

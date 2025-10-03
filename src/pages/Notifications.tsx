@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns';
 import { 
   Bell, 
@@ -12,14 +12,13 @@ import {
   Settings,
   Gift,
   User,
-  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Notification {
   id: string;
@@ -29,64 +28,10 @@ interface Notification {
   timestamp: Date;
   read: boolean;
   priority?: 'low' | 'medium' | 'high';
-  actionUrl?: string;
-  metadata?: any;
 }
 
 const Notifications: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'earnings',
-      title: 'Credits Earned!',
-      message: 'You earned 15 credits for completing "Watch Guitar Tutorial" task',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-      read: false,
-      priority: 'medium',
-      metadata: { credits: 15, taskType: 'watch' }
-    },
-    {
-      id: '2',
-      type: 'achievements',
-      title: 'Achievement Unlocked!',
-      message: 'Congratulations! You have reached Level 5',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      read: false,
-      priority: 'high',
-      metadata: { level: 5 }
-    },
-    {
-      id: '3',
-      type: 'promotions',
-      title: 'Campaign Update',
-      message: 'Your "Cooking Masterclass" campaign has received 50+ views',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-      read: true,
-      priority: 'medium',
-      metadata: { campaignName: 'Cooking Masterclass', views: 50 }
-    },
-    {
-      id: '4',
-      type: 'system',
-      title: 'Daily Reward Available',
-      message: 'Your daily reward of 50 credits is ready to claim',
-      timestamp: new Date(Date.now() - 25 * 60 * 60 * 1000), // 25 hours ago
-      read: true,
-      priority: 'low',
-      metadata: { rewardAmount: 50 }
-    },
-    {
-      id: '5',
-      type: 'social',
-      title: 'New Referral',
-      message: 'Someone joined using your referral code! You both earned bonus credits',
-      timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000), // 2 days ago
-      read: true,
-      priority: 'medium',
-      metadata: { bonusCredits: 10 }
-    }
-  ]);
-
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<'all' | 'earnings' | 'promotions' | 'system' | 'achievements' | 'social'>('all');
 
   const getNotificationIcon = (type: Notification['type']) => {
@@ -159,14 +104,17 @@ const Notifications: React.FC = () => {
 
   const markAllAsRead = () => {
     setNotifications(notifications.map(n => ({ ...n, read: true })));
+    toast.success('All notifications marked as read');
   };
 
   const deleteNotification = (id: string) => {
     setNotifications(notifications.filter(n => n.id !== id));
+    toast.success('Notification deleted');
   };
 
   const clearAllNotifications = () => {
     setNotifications([]);
+    toast.success('All notifications cleared');
   };
 
   return (
@@ -258,15 +206,14 @@ const Notifications: React.FC = () => {
                   </h3>
                   
                   <div className="space-y-3">
-                    {dayNotifications.map((notification, index) => (
+                    {dayNotifications.map((notification) => (
                       <Card 
                         key={notification.id}
                         className={cn(
-                          "transition-all duration-200 hover:shadow-md border-l-4 animate-fade-in",
+                          "transition-all duration-200 hover:shadow-md border-l-4",
                           getPriorityColor(notification.priority),
                           !notification.read && "bg-muted/30"
                         )}
-                        style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start gap-4">
@@ -299,11 +246,6 @@ const Notifications: React.FC = () => {
                                     <Badge variant="outline" className="text-xs capitalize">
                                       {notification.type}
                                     </Badge>
-                                    {notification.priority === 'high' && (
-                                      <Badge variant="destructive" className="text-xs">
-                                        High Priority
-                                      </Badge>
-                                    )}
                                   </div>
                                 </div>
                                 

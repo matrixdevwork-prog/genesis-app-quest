@@ -1,73 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Heart, UserPlus, Filter, RefreshCw, Clock, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 const Tasks: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [tasks, setTasks] = useState<any[]>([]);
 
-  // Mock task data
-  const tasks = [
-    {
-      id: 1,
-      type: 'watch',
-      title: 'Amazing Guitar Solo Cover',
-      channel: 'MusicMaster',
-      thumbnail: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&h=200&fit=crop',
-      duration: '3:45',
-      credits: 1,
-      requirement: 'Watch for 30 seconds',
-    },
-    {
-      id: 2,
-      type: 'like',
-      title: 'How to Code Better',
-      channel: 'DevTips',
-      thumbnail: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=300&h=200&fit=crop',
-      duration: '12:30',
-      credits: 2,
-      requirement: 'Like the video',
-    },
-    {
-      id: 3,
-      type: 'subscribe',
-      title: 'Travel Vlog - Paris',
-      channel: 'WanderlustTV',
-      thumbnail: 'https://images.unsplash.com/photo-1502602898536-47ad22581b52?w=300&h=200&fit=crop',
-      duration: '8:15',
-      credits: 5,
-      requirement: 'Subscribe to channel',
-    },
-    {
-      id: 4,
-      type: 'watch',
-      title: 'Cooking Masterclass',
-      channel: 'ChefLife',
-      thumbnail: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=200&fit=crop',
-      duration: '15:20',
-      credits: 1,
-      requirement: 'Watch for 30 seconds',
-    },
-  ];
+  useEffect(() => {
+    loadTasks();
+  }, []);
+
+  const loadTasks = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          videos (
+            id,
+            title,
+            thumbnail_url,
+            duration,
+            channel_name
+          )
+        `)
+        .eq('status', 'pending')
+        .neq('created_by', user?.id)
+        .limit(20);
+
+      if (error) throw error;
+      setTasks(data || []);
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      toast.error('Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredTasks = activeTab === 'all' 
     ? tasks 
-    : tasks.filter(task => task.type === activeTab);
+    : tasks.filter(task => task.task_type === activeTab);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await loadTasks();
     setRefreshing(false);
   };
 
-  const handleTaskAction = (taskId: number, action: string) => {
-    console.log(`Performing ${action} on task ${taskId}`);
-    // TODO: Implement task completion logic in Phase 6
+  const handleTaskAction = (taskId: string, action: string) => {
+    toast.info('Task system will be fully implemented in Phase 6');
   };
 
   const getTaskIcon = (type: string) => {
@@ -87,6 +80,14 @@ const Tasks: React.FC = () => {
       default: return 'bg-muted text-muted-foreground';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
@@ -145,21 +146,27 @@ const Tasks: React.FC = () => {
           ) : (
             <div className="grid gap-4">
               {filteredTasks.map((task) => {
-                const TaskIcon = getTaskIcon(task.type);
+                const TaskIcon = getTaskIcon(task.task_type);
+                const video = task.videos;
+                
                 return (
                   <Card key={task.id} className="overflow-hidden hover:shadow-md transition-shadow">
                     <CardContent className="p-0">
                       <div className="flex">
                         {/* Thumbnail */}
-                        <div className="relative w-48 h-32 flex-shrink-0">
-                          <img 
-                            src={task.thumbnail} 
-                            alt={task.title}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                            {task.duration}
-                          </div>
+                        <div className="relative w-48 h-32 flex-shrink-0 bg-muted">
+                          {video?.thumbnail_url && (
+                            <img 
+                              src={video.thumbnail_url} 
+                              alt={video.title}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                          {video?.duration && (
+                            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                              {video.duration}s
+                            </div>
+                          )}
                         </div>
 
                         {/* Content */}
@@ -168,31 +175,33 @@ const Tasks: React.FC = () => {
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <h3 className="font-semibold text-foreground line-clamp-2">
-                                  {task.title}
+                                  {video?.title || 'Video Task'}
                                 </h3>
                                 <p className="text-sm text-muted-foreground">
-                                  {task.channel}
+                                  {video?.channel_name || 'Unknown Channel'}
                                 </p>
                               </div>
-                              <Badge className={`ml-2 ${getTaskTypeColor(task.type)}`}>
+                              <Badge className={`ml-2 ${getTaskTypeColor(task.task_type)}`}>
                                 <TaskIcon className="h-3 w-3 mr-1" />
-                                {task.type}
+                                {task.task_type}
                               </Badge>
                             </div>
                             
                             <p className="text-sm text-muted-foreground">
-                              {task.requirement}
+                              {task.task_type === 'watch' && 'Watch for 30 seconds'}
+                              {task.task_type === 'like' && 'Like the video'}
+                              {task.task_type === 'subscribe' && 'Subscribe to channel'}
                             </p>
                           </div>
 
                           <div className="flex items-center justify-between mt-4">
                             <div className="flex items-center text-primary">
                               <Coins className="h-4 w-4 mr-1" />
-                              <span className="font-semibold">{task.credits} Credits</span>
+                              <span className="font-semibold">{task.credits_reward} Credits</span>
                             </div>
                             <Button 
                               size="sm"
-                              onClick={() => handleTaskAction(task.id, task.type)}
+                              onClick={() => handleTaskAction(task.id, task.task_type)}
                             >
                               Start Task
                             </Button>

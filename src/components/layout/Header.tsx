@@ -1,6 +1,6 @@
 import React from 'react';
-import { Bell, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Bell, User, ArrowLeft } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -9,11 +9,25 @@ import { useAuth } from '@/contexts/AuthContext';
 const Header: React.FC = () => {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Show back button on pages other than dashboard and root
+  const showBackButton = location.pathname !== '/dashboard' && location.pathname !== '/';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center justify-between px-4">
         <div className="flex items-center space-x-4">
+          {showBackButton && (
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => navigate(-1)}
+              className="mr-2"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
           <h1 className="text-xl font-bold text-primary">Sub4Sub</h1>
         </div>
 

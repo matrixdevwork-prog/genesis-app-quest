@@ -20,10 +20,31 @@ const Tasks: React.FC = () => {
     loadTasks();
   }, []);
 
+  // Realtime subscribe to new tasks
+  useEffect(() => {
+    const channel = supabase
+      .channel('tasks-feed')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'tasks' },
+        (payload) => {
+          const newTask = payload.new as any;
+          if (newTask.status === 'pending' && newTask.created_by !== user?.id) {
+            setTasks((prev) => [newTask, ...prev].slice(0, 50));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const loadTasks = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('tasks')
         .select(`
           *,
@@ -36,8 +57,13 @@ const Tasks: React.FC = () => {
           )
         `)
         .eq('status', 'pending')
-        .neq('created_by', user?.id)
         .limit(20);
+
+      if (user?.id) {
+        query = query.neq('created_by', user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setTasks(data || []);

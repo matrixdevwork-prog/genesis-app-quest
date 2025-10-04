@@ -172,30 +172,69 @@ async function createCampaignWithTasks(
 
   // Create tasks for the campaign
   const tasks = []
-  const creditsPerAction = Math.floor(creditsAllocated / targetActions)
   
-  // Create tasks based on target actions
-  for (let i = 0; i < targetActions; i++) {
-    const taskTypes = ['watch', 'like', 'subscribe']
-    const taskType = taskTypes[i % taskTypes.length]
-    const credits = taskType === 'watch' ? 1 : taskType === 'like' ? 2 : 5
-    
+  // Distribute tasks evenly across types based on credits available
+  const watchTasks = Math.floor(targetActions * 0.5) // 50% watch tasks (1 credit each)
+  const likeTasks = Math.floor(targetActions * 0.3)  // 30% like tasks (2 credits each)
+  const subscribeTasks = targetActions - watchTasks - likeTasks // Remaining as subscribe (5 credits each)
+  
+  // Create watch tasks
+  for (let i = 0; i < watchTasks; i++) {
     tasks.push({
       video_id: videoId,
-      task_type: taskType,
-      credits_reward: credits,
+      task_type: 'watch',
+      credits_reward: 1,
+      created_by: userId,
+      status: 'pending'
+    })
+  }
+  
+  // Create like tasks
+  for (let i = 0; i < likeTasks; i++) {
+    tasks.push({
+      video_id: videoId,
+      task_type: 'like',
+      credits_reward: 2,
+      created_by: userId,
+      status: 'pending'
+    })
+  }
+  
+  // Create subscribe tasks
+  for (let i = 0; i < subscribeTasks; i++) {
+    tasks.push({
+      video_id: videoId,
+      task_type: 'subscribe',
+      credits_reward: 5,
       created_by: userId,
       status: 'pending'
     })
   }
 
-  const { error: tasksError } = await supabase
+  console.log(`Creating ${tasks.length} tasks for campaign ${campaignId}`)
+  
+  const { data: createdTasks, error: tasksError } = await supabase
     .from('tasks')
     .insert(tasks)
+    .select()
 
-  if (tasksError) throw tasksError
+  if (tasksError) {
+    console.error('Error creating tasks:', tasksError)
+    throw tasksError
+  }
 
-  return { campaignId, videoMetadata, tasksCreated: tasks.length }
+  console.log(`Successfully created ${createdTasks?.length || 0} tasks`)
+
+  return { 
+    campaignId, 
+    videoMetadata, 
+    tasksCreated: createdTasks?.length || 0,
+    taskBreakdown: {
+      watch: watchTasks,
+      like: likeTasks,
+      subscribe: subscribeTasks
+    }
+  }
 }
 
 async function updateCampaignStatus(supabase: any, campaignId: string, status: string) {

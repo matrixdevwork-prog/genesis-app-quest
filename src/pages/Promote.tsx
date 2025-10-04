@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { youtubeService } from '@/services/youtubeService';
 import { Plus, Play, Pause, BarChart3, Eye, Heart, UserPlus, Coins, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -96,64 +97,21 @@ const Promote: React.FC = () => {
 
     setIsCreating(true);
     try {
-      // Extract video ID from URL
-      const videoId = newCampaign.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)?.[1];
-      if (!videoId) {
-        toast.error('Invalid YouTube URL');
-        return;
+      // Use the campaign-management edge function to create campaign with tasks
+      const { data, error } = await youtubeService.createCampaign(
+        user.id,
+        newCampaign.videoUrl,
+        newCampaign.title,
+        newCampaign.creditsToAllocate[0],
+        newCampaign.targetActions.length * 50 // Each action type gets 50 tasks
+      );
+
+      if (error) {
+        console.error('Campaign creation error:', error);
+        throw error;
       }
 
-      // Create or get video record
-      const { data: existingVideo } = await supabase
-        .from('videos')
-        .select('id')
-        .eq('youtube_id', videoId)
-        .single();
-
-      let videoDbId = existingVideo?.id;
-
-      if (!videoDbId) {
-        // Create new video record
-        const { data: newVideo, error: videoError } = await supabase
-          .from('videos')
-          .insert({
-            youtube_id: videoId,
-            title: newCampaign.title,
-            description: newCampaign.description || null,
-            channel_name: 'Your Channel', // This should come from YouTube API
-          })
-          .select()
-          .single();
-
-        if (videoError) throw videoError;
-        videoDbId = newVideo.id;
-      }
-
-      // Create campaign
-      const { data: campaign, error: campaignError } = await supabase
-        .from('campaigns')
-        .insert({
-          user_id: user.id,
-          video_id: videoDbId,
-          title: newCampaign.title,
-          credits_allocated: newCampaign.creditsToAllocate[0],
-          target_actions: newCampaign.targetActions.length * 100, // Placeholder for now
-          status: 'active',
-        })
-        .select()
-        .single();
-
-      if (campaignError) throw campaignError;
-
-      // Deduct credits
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ credits: profile.credits - newCampaign.creditsToAllocate[0] })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
-
-      toast.success('Campaign created successfully!');
+      toast.success(`Campaign created! ${data.tasksCreated} tasks generated.`);
       setShowCreateModal(false);
       setNewCampaign({
         title: '',

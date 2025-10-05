@@ -59,6 +59,13 @@ export type Database = {
             foreignKeyName: "campaigns_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "leaderboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -145,6 +152,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "credit_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "credit_transactions_user_id_fkey"
             columns: ["user_id"]
@@ -295,6 +309,13 @@ export type Database = {
             foreignKeyName: "profiles_referred_by_fkey"
             columns: ["referred_by"]
             isOneToOne: false
+            referencedRelation: "leaderboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -386,6 +407,13 @@ export type Database = {
           video_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leaderboard"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_created_by_fkey"
             columns: ["created_by"]
@@ -492,6 +520,13 @@ export type Database = {
             foreignKeyName: "user_roles_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "leaderboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -534,6 +569,13 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard"
             referencedColumns: ["id"]
           },
           {
@@ -583,7 +625,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      leaderboard: {
+        Row: {
+          avatar_url: string | null
+          credits: number | null
+          id: string | null
+          level: number | null
+          username: string | null
+          xp: number | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          credits?: number | null
+          id?: string | null
+          level?: number | null
+          username?: string | null
+          xp?: number | null
+        }
+        Update: {
+          avatar_url?: string | null
+          credits?: number | null
+          id?: string | null
+          level?: number | null
+          username?: string | null
+          xp?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_credits: {

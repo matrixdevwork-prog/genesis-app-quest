@@ -64,12 +64,11 @@ export const userService = {
     return { isAdmin: !!data && !error, error };
   },
 
-  // Get leaderboard
+  // Get leaderboard - uses public leaderboard view
   async getLeaderboard(limit = 100) {
     const { data, error } = await supabase
-      .from('profiles')
-      .select('id, username, full_name, avatar_url, credits, level, xp')
-      .order('credits', { ascending: false })
+      .from('leaderboard')
+      .select('*')
       .limit(limit);
 
     return { data, error };

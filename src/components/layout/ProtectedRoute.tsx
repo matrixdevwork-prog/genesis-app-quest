@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spinner } from '@/components/ui/spinner';
+import { userService } from '@/services/userService';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,8 +15,24 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [checkingAdmin, setCheckingAdmin] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    if (requireAdmin && user && !checkingAdmin) {
+      setCheckingAdmin(true);
+      userService.isAdmin(user.id).then(({ isAdmin, error }) => {
+        if (!error) {
+          setIsAdmin(isAdmin);
+        } else {
+          setIsAdmin(false);
+        }
+        setCheckingAdmin(false);
+      });
+    }
+  }, [user, requireAdmin, checkingAdmin]);
+
+  if (loading || (requireAdmin && isAdmin === null)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Spinner />
@@ -27,9 +44,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // TODO: Implement admin role checking when admin features are added
-  if (requireAdmin) {
-    // For now, redirect to dashboard
+  if (requireAdmin && !isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 

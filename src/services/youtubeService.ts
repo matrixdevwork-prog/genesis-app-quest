@@ -18,7 +18,7 @@ export const youtubeService = {
     const { data, error } = await supabase.functions.invoke('campaign-management', {
       body: {
         action: 'create',
-        userId,
+        // userId is extracted from JWT in edge function, not sent from client
         videoUrl,
         title,
         creditsAllocated,

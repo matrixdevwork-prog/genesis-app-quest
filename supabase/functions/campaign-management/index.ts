@@ -8,7 +8,6 @@ const corsHeaders = {
 
 interface CampaignRequest {
   action: 'create' | 'fetch_video_metadata' | 'update_status' | 'get_analytics'
-  userId?: string
   videoUrl?: string
   title?: string
   creditsAllocated?: number
@@ -23,6 +22,33 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authentication
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Get authenticated user from JWT
+    const token = authHeader.replace('Bearer ', '')
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!
+    )
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const authenticatedUserId = user.id
+
     const { action, ...params }: CampaignRequest = await req.json()
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -38,31 +64,100 @@ serve(async (req) => {
 
     switch (action) {
       case 'fetch_video_metadata':
-        result = await fetchVideoMetadata(params.videoUrl!, youtubeApiKey)
+        // Validate input
+        if (!params.videoUrl || typeof params.videoUrl !== 'string') {
+          throw new Error('Invalid videoUrl')
+        }
+        if (params.videoUrl.length > 500) {
+          throw new Error('URL too long')
+        }
+        result = await fetchVideoMetadata(params.videoUrl, youtubeApiKey)
         break
       
       case 'create':
+        // Validate all inputs
+        if (!params.videoUrl || typeof params.videoUrl !== 'string' || params.videoUrl.length > 500) {
+          throw new Error('Invalid videoUrl')
+        }
+        if (!params.title || typeof params.title !== 'string' || params.title.length < 3 || params.title.length > 200) {
+          throw new Error('Title must be between 3 and 200 characters')
+        }
+        if (!params.creditsAllocated || typeof params.creditsAllocated !== 'number' || 
+            params.creditsAllocated < 1 || params.creditsAllocated > 100000 || 
+            !Number.isInteger(params.creditsAllocated)) {
+          throw new Error('Credits must be between 1 and 100,000')
+        }
+        if (!params.targetActions || typeof params.targetActions !== 'number' || 
+            params.targetActions < 1 || params.targetActions > 10000 || 
+            !Number.isInteger(params.targetActions)) {
+          throw new Error('Target actions must be between 1 and 10,000')
+        }
+
+        // Validate user has enough credits
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('credits')
+          .eq('id', authenticatedUserId)
+          .single()
+
+        if (!profile || profile.credits < params.creditsAllocated) {
+          throw new Error('Insufficient credits')
+        }
+
         result = await createCampaignWithTasks(
           supabase,
-          params.userId!,
-          params.videoUrl!,
-          params.title!,
-          params.creditsAllocated!,
-          params.targetActions!,
+          authenticatedUserId, // Use authenticated user ID, not client-provided
+          params.videoUrl,
+          params.title.trim(),
+          params.creditsAllocated,
+          params.targetActions,
           youtubeApiKey
         )
         break
       
       case 'update_status':
+        if (!params.campaignId || typeof params.campaignId !== 'string') {
+          throw new Error('Invalid campaignId')
+        }
+        if (!params.status || !['active', 'paused', 'completed', 'cancelled'].includes(params.status)) {
+          throw new Error('Invalid status')
+        }
+
+        // Verify user owns the campaign
+        const { data: campaign } = await supabase
+          .from('campaigns')
+          .select('user_id')
+          .eq('id', params.campaignId)
+          .single()
+
+        if (!campaign || campaign.user_id !== authenticatedUserId) {
+          throw new Error('Unauthorized to update this campaign')
+        }
+
         result = await updateCampaignStatus(
           supabase,
-          params.campaignId!,
-          params.status!
+          params.campaignId,
+          params.status
         )
         break
       
       case 'get_analytics':
-        result = await getCampaignAnalytics(supabase, params.campaignId!)
+        if (!params.campaignId || typeof params.campaignId !== 'string') {
+          throw new Error('Invalid campaignId')
+        }
+
+        // Verify user owns the campaign
+        const { data: campaignForAnalytics } = await supabase
+          .from('campaigns')
+          .select('user_id')
+          .eq('id', params.campaignId)
+          .single()
+
+        if (!campaignForAnalytics || campaignForAnalytics.user_id !== authenticatedUserId) {
+          throw new Error('Unauthorized to view this campaign')
+        }
+
+        result = await getCampaignAnalytics(supabase, params.campaignId)
         break
       
       default:
@@ -83,7 +178,7 @@ serve(async (req) => {
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
+        status: error instanceof Error && error.message.includes('Unauthorized') ? 403 : 400
       }
     )
   }

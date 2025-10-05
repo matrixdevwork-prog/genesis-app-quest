@@ -12,7 +12,7 @@ export const fraudService = {
     const { data, error } = await supabase.functions.invoke('fraud-detection', {
       body: {
         action: 'log_event',
-        userId,
+        // userId is extracted from JWT in edge function, not sent from client
         ipAddress,
         deviceFingerprint,
         eventType,
@@ -51,15 +51,15 @@ export const fraudService = {
   // Check rate limit
   async checkRateLimit(
     userId: string,
-    action: string,
+    actionType: string,
     limit = 10,
     windowMinutes = 60
   ) {
     const { data, error } = await supabase.functions.invoke('fraud-detection', {
       body: {
         action: 'rate_limit_check',
-        userId,
-        actionType: action,
+        // userId is extracted from JWT in edge function, not sent from client
+        actionType,
         limit,
         windowMinutes
       }

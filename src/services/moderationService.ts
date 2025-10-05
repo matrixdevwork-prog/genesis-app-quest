@@ -17,7 +17,7 @@ export const moderationService = {
     const { data, error } = await supabase.functions.invoke('moderation', {
       body: {
         action: 'create_report',
-        reportedBy,
+        // reportedBy is extracted from JWT in edge function, not sent from client
         contentType,
         contentId,
         reason,
@@ -39,7 +39,7 @@ export const moderationService = {
       body: {
         action: 'review_report',
         reportId,
-        reviewedBy,
+        // reviewedBy is extracted from JWT in edge function, not sent from client
         status,
         resolutionNotes
       }
@@ -60,7 +60,7 @@ export const moderationService = {
       body: {
         action: 'ban_user',
         userId,
-        bannedBy,
+        // bannedBy is extracted from JWT in edge function, not sent from client
         reason,
         banType,
         expiresAt
@@ -93,7 +93,7 @@ export const moderationService = {
         action: 'process_appeal',
         banId,
         appealStatus,
-        reviewedBy
+        // reviewedBy is extracted from JWT in edge function, not sent from client
       }
     });
 
@@ -129,7 +129,7 @@ export const moderationService = {
       body: {
         action: 'moderate_content',
         queueId,
-        reviewedBy,
+        // reviewedBy is extracted from JWT in edge function, not sent from client
         status,
         notes
       }

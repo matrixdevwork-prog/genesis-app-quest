@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { taskService } from '@/services/taskService';
 
 const Tasks: React.FC = () => {
   const { user } = useAuth();
@@ -85,8 +86,28 @@ const Tasks: React.FC = () => {
     setRefreshing(false);
   };
 
-  const handleTaskAction = (taskId: string, action: string) => {
-    toast.info('Task system will be fully implemented in Phase 6');
+  const handleTaskAction = async (task: any) => {
+    try {
+      const { error } = await taskService.completeTask(
+        user!.id,
+        task.id,
+        task.task_type,
+        task.videos?.youtube_id || ''
+      );
+
+      if (error) {
+        toast.error(error.message || "Failed to complete task");
+        return;
+      }
+
+      toast.success(`Task completed! You earned ${task.credits_reward} credits`);
+      
+      // Reload tasks
+      await loadTasks();
+    } catch (error) {
+      console.error('Task completion error:', error);
+      toast.error("Failed to complete task");
+    }
   };
 
   const getTaskIcon = (type: string) => {
@@ -227,7 +248,7 @@ const Tasks: React.FC = () => {
                             </div>
                             <Button 
                               size="sm"
-                              onClick={() => handleTaskAction(task.id, task.task_type)}
+                              onClick={() => handleTaskAction(task)}
                             >
                               Start Task
                             </Button>
